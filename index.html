@@ -1,0 +1,143 @@
+<!doctype html><title>Playing around with Audio API</title>
+<canvas></canvas>
+<div id="Error"></div>
+
+<script>
+	// Modified from Boris Smus's example at http://webaudioapi.com/samples/visualizer/
+	var context = new (window.AudioContext || window.webkitAudioContext)();
+
+	function loadAndDecode(url, cb){
+		var req = new XMLHttpRequest();
+		req.open("GET", url, true);
+		req.responseType = "arraybuffer";
+		req.onload = function(){
+			context.decodeAudioData(req.response, cb);
+		}
+		req.send();
+	}
+
+	function play(buffer){
+	    var analyser = context.createAnalyser();
+	    analyser.connect(context.destination);
+
+	    source = context.createBufferSource();
+	    source.connect(analyser);
+	    source.buffer = buffer;
+		source.start(0);
+
+	    var freqs = new Uint8Array(analyser.frequencyBinCount);
+		var times = new Uint8Array(analyser.frequencyBinCount);
+
+	    requestAnimationFrame(drawHost.bind(null, analyser, freqs, times));
+	}
+
+	var errorElement = document.querySelector('#Error');
+	function drawHost(analyser, freqs, times){
+		var errorMessage = "";
+		
+		try{
+			draw(analyser, freqs, times);
+		} catch(e){
+			errorMessage = e.message;
+		}
+
+		errorElement.innerText = errorMessage;
+
+		requestAnimationFrame(function(){
+			drawHost(analyser, freqs, times)
+		});
+	}
+
+	var canvas = document.querySelector('canvas');
+    var drawContext = canvas.getContext('2d');
+
+	loadAndDecode('isabella-of-castile.mp3', play);
+</script>
+<script id="DrawScript" contenteditable="true">// You can and should edit anything you see here
+window.draw = function(analyser, freqs, times){
+  analyser.getByteFrequencyData(freqs);
+  analyser.getByteTimeDomainData(times);
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  analyser.smoothingTimeConstant = 0.10;
+  var fftPower = 11; // Can be between 5 and 11
+  analyser.fftSize = 1 << fftPower;
+  analyser.minDecibels = -160;
+  analyser.maxDecibels = 0;
+
+  var frequencyBinCount = analyser.frequencyBinCount;
+
+  for (var i = 0; i < frequencyBinCount; i++) {
+    // frequency domain
+    var height = canvas.height * freqs[i] / 256;
+    var offset = canvas.height - height - 1;
+    var barWidth = canvas.width / frequencyBinCount;
+    var hue = i / frequencyBinCount * 100;
+    drawContext.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+    drawContext.fillRect(i * barWidth, offset, barWidth, height);
+
+    // time domain
+    var height = canvas.height * times[i] / 256;
+    var offset = canvas.height - height - 1;
+    var barWidth = canvas.width / frequencyBinCount;
+    drawContext.fillStyle = 'white';
+    drawContext.fillRect(i * barWidth, offset, 1, 2);
+  }
+}
+
+// The song is "Gooey by Glass Animal"
+</script>
+<script>
+	var drawScript = document.querySelector('#DrawScript');
+	drawScript.addEventListener('keyup', function(){
+		var text = drawScript.innerText;
+		eval(text);
+	});
+</script>
+<style>	
+
+	html, body{ 
+		margin:0;
+		height:100%;
+		background-color:black; 
+	} 
+
+	#DrawScript{
+		padding:10px;
+		display:block;
+		position:fixed;
+		z-index:10;
+		color:white;
+		top:0px;
+		right:0px;
+		height:100%;
+		white-space:pre;
+		font-family:monospace;
+		overflow-y:auto;
+	}
+
+	#DrawScript:before{
+		content:"";
+		background-color:white;
+		display:block;
+		position:absolute;
+		width:100%;
+		height:100%;
+		top:0px;
+		left:0px;
+		opacity:.3;
+
+	}
+
+	#Error{
+		padding:20px;
+		position:fixed;
+		top:0px;
+		left:0px;
+		background-color:black;
+		color:red;
+		font-weight:bold;
+	}
+</style>
