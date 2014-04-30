@@ -58,21 +58,22 @@
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
 
-		analyser.smoothingTimeConstant = smoothing;
-		analyser.fftSize = 1 << fftPower;
-		analyser.minDecibels = minDecibels;
-		analyser.maxDecibels = maxDecibels;
-		analyser.getByteFrequencyData(freqs);
-		analyser.getByteTimeDomainData(times);
-
 		try{
-			draw(analyser, freqs, times);
+			draw(analyser.frequencyBinCount, freqs, times);
+			analyser.smoothingTimeConstant = smoothing;
+			analyser.fftSize = 1 << fftPower;
+			analyser.minDecibels = minDecibels;
+			analyser.maxDecibels = maxDecibels;
+			analyser.getByteFrequencyData(freqs);
+			analyser.getByteTimeDomainData(times);
 		} catch(e){
 			errorMessage = e.message;
 		}
 
-		messageElement.innerText = errorMessage;
-
+		if(!hasError){ // don't clear out eval error
+			messageElement.innerText = errorMessage;
+		}
+		
 		requestAnimationFrame(function(){
 			drawHost(analyser, freqs, times)
 		});
@@ -87,49 +88,58 @@
 </script>
 <div id="ScriptContainer">
 <div id="Shadow"></div>
-<script id="DrawScript" contenteditable="true" style="display:none">
+<script id="DrawScript" contenteditable="true" spellcheck="false">
 ///////////////////////////////////////////////////
-// You can and should edit this code directly here
+// EDIT THIS CODE! YOU CAN'T GO WRONG!
 ///////////////////////////////////////////////////
 
-window.draw = function(analyser, freqs, times){
-  fftPower = 11; // Can be between 5 and 11
-  smoothing = 0.1; // can be between 0 and 1
+window.draw = function(frequencyBinCount, freqs, times){
+  fftPower = 9; // Can be between 5 and 11
+  smoothing = 0.9; // can be between 0 and 1
   minDecibels = -160;
   maxDecibels = 0;
 
-  var frequencyBinCount = analyser.frequencyBinCount;
   for (var i = 0; i < frequencyBinCount; i++) {
     // frequency domain
-    var height = canvas.height * freqs[i] / 256;
-    var offset = canvas.height - height;
-    var barWidth = canvas.width / frequencyBinCount;
-    var hue = freqs[i];
-    drawContext.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
-    drawContext.fillRect(i * barWidth, offset, barWidth, height);
+    hue = freqs[i];
+    saturation = '100%';
+    luminance = '50%';
+    hsl = [hue, saturation, luminance];
+    drawContext.fillStyle = 'hsl('+ hsl +')';
+    
+    width = canvas.width / frequencyBinCount;
+    height = canvas.height * freqs[i] / 256;
+    x = i * width;
+    y = canvas.height - height;
+    drawContext.fillRect(x, y, width + 1, height);
 
     // time domain
-    var height = canvas.height * times[i] / 512;
-    var offset = canvas.height - height - 256;
-    var barWidth = canvas.width / frequencyBinCount;
-    drawContext.fillStyle = 'white';
-    var red = times[i];
-    var green = 255 - times[i];
-    var blue = 255;
-    drawContext.fillStyle = 'rgb(' + [red, green, blue].join(',') + ')';
-    drawContext.fillRect(i * barWidth, offset, 2, 20);
+    red = 255; // out of 255
+    green = times[i]; // out of 255
+    blue = times[i]; // out of 255
+    rgb = [red, green, blue];
+	drawContext.fillStyle = 'rgb(' + rgb + ')';
+    
+    width = 2;
+    height = 20;
+    x = i * canvas.width / frequencyBinCount;
+    y = canvas.height - (canvas.height * times[i] / 512) - 256;
+    drawContext.fillRect(x, y, width, height);
   }
 };
 </script>
 </div>
 <script>
 	var drawScript = document.querySelector('#DrawScript');
+	var hasError = false;
 	drawScript.addEventListener('keyup', function(){
 		var text = drawScript.innerText;
 		try{
 			eval(text);
+			hasError = false;
 		} catch(e){
-			messageElement.innerText = e.message;
+			hasError = true;
+			messageElement.innerText = "Unable to update script: " + e.message;
 		}
 	});
 </script>
@@ -146,7 +156,7 @@ window.draw = function(analyser, freqs, times){
 		padding:10px;
 		position:fixed;
 		height:100%;
-		width:600px;
+		width:560px;
 		right:0px;
 		top:0px;
 	}
@@ -171,7 +181,7 @@ window.draw = function(analyser, freqs, times){
 		z-index:10;
 		color:white;
 		height:100%;
-		width:580px;
+		width:540px;
 		white-space:pre;
 		font-family:monospace;
 		overflow-y:auto;
@@ -187,5 +197,6 @@ window.draw = function(analyser, freqs, times){
 		color:white;
 		font-family:monospace;
 		font-weight:bold;
+		width:500px;
 	}
 </style>
