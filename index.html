@@ -1,22 +1,44 @@
 <!doctype html><title>Playing around with Audio API</title>
 <canvas></canvas>
-<div id="Error"></div>
-
+<div id="Message">Drag a sound file onto this window.</div>
 <script>
-	// Modified from Boris Smus's example at http://webaudioapi.com/samples/visualizer/
-	var context = new (window.AudioContext || window.webkitAudioContext)();
-
-	function loadAndDecode(url, cb){
-		var req = new XMLHttpRequest();
-		req.open("GET", url, true);
-		req.responseType = "arraybuffer";
-		req.onload = function(){
-			context.decodeAudioData(req.response, cb);
-		}
-		req.send();
+	var messageElement = document.getElementById('Message');
+	
+	try{
+		var context = new (window.AudioContext || window.webkitAudioContext)();
+	} catch(e){
+		messageElement.innerText = "You must use Google Chrome for this to work.";
 	}
+	
+	var canvas = document.querySelector('canvas');
+    var drawContext = canvas.getContext('2d');
+
+	document.body.addEventListener('dragover', function (e) {
+		e.stopPropagation();
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'copy';
+	}, false);
+
+	var playing = false; // Keeps it simple
+	document.body.addEventListener('drop', function (e) {
+		if(playing) return;
+		playing = true;
+
+		e.stopPropagation();
+		e.preventDefault();
+
+		var files = e.dataTransfer.files;
+		messageElement.innerText = "Loading...";
+		var reader = new FileReader();
+		reader.readAsArrayBuffer(files[0]);
+		reader.onload = function(e){
+			context.decodeAudioData(e.target.result, play);
+		};
+	}, false);
 
 	function play(buffer){
+		document.getElementById('DrawScript').style.display = "block";
+
 	    var analyser = context.createAnalyser();
 	    analyser.connect(context.destination);
 
@@ -31,113 +53,139 @@
 	    requestAnimationFrame(drawHost.bind(null, analyser, freqs, times));
 	}
 
-	var errorElement = document.querySelector('#Error');
 	function drawHost(analyser, freqs, times){
 		var errorMessage = "";
-		
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+
+		analyser.smoothingTimeConstant = smoothing;
+		analyser.fftSize = 1 << fftPower;
+		analyser.minDecibels = minDecibels;
+		analyser.maxDecibels = maxDecibels;
+		analyser.getByteFrequencyData(freqs);
+		analyser.getByteTimeDomainData(times);
+
 		try{
 			draw(analyser, freqs, times);
 		} catch(e){
 			errorMessage = e.message;
 		}
 
-		errorElement.innerText = errorMessage;
+		messageElement.innerText = errorMessage;
 
 		requestAnimationFrame(function(){
 			drawHost(analyser, freqs, times)
 		});
 	}
 
-	var canvas = document.querySelector('canvas');
-    var drawContext = canvas.getContext('2d');
 
-	loadAndDecode('isabella-of-castile', play);
+    // Globals used in draw loop
+	var fftPower = 11;
+	var smoothing = 0.1;
+	var minDecibels = -160;
+	var maxDecibels = 0;
 </script>
-<script id="DrawScript" contenteditable="true">// You can and should edit anything you see here
+<div id="ScriptContainer">
+<div id="Shadow"></div>
+<script id="DrawScript" contenteditable="true" style="display:none">
+///////////////////////////////////////////////////
+// You can and should edit this code directly here
+///////////////////////////////////////////////////
+
 window.draw = function(analyser, freqs, times){
-  analyser.getByteFrequencyData(freqs);
-  analyser.getByteTimeDomainData(times);
-
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  analyser.smoothingTimeConstant = 0.10;
-  var fftPower = 11; // Can be between 5 and 11
-  analyser.fftSize = 1 << fftPower;
-  analyser.minDecibels = -160;
-  analyser.maxDecibels = 0;
+  fftPower = 11; // Can be between 5 and 11
+  smoothing = 0.1; // can be between 0 and 1
+  minDecibels = -160;
+  maxDecibels = 0;
 
   var frequencyBinCount = analyser.frequencyBinCount;
-
   for (var i = 0; i < frequencyBinCount; i++) {
     // frequency domain
     var height = canvas.height * freqs[i] / 256;
-    var offset = canvas.height - height - 1;
+    var offset = canvas.height - height;
     var barWidth = canvas.width / frequencyBinCount;
-    var hue = i / frequencyBinCount * 100;
+    var hue = freqs[i];
     drawContext.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
     drawContext.fillRect(i * barWidth, offset, barWidth, height);
 
     // time domain
-    var height = canvas.height * times[i] / 256;
-    var offset = canvas.height - height - 1;
+    var height = canvas.height * times[i] / 512;
+    var offset = canvas.height - height - 256;
     var barWidth = canvas.width / frequencyBinCount;
     drawContext.fillStyle = 'white';
-    drawContext.fillRect(i * barWidth, offset, 1, 2);
+    var red = times[i];
+    var green = 255 - times[i];
+    var blue = 255;
+    drawContext.fillStyle = 'rgb(' + [red, green, blue].join(',') + ')';
+    drawContext.fillRect(i * barWidth, offset, 2, 20);
   }
-}
-
-// The song is "Isabella of Castile by Starfucker"
+};
 </script>
+</div>
 <script>
 	var drawScript = document.querySelector('#DrawScript');
 	drawScript.addEventListener('keyup', function(){
 		var text = drawScript.innerText;
-		eval(text);
+		try{
+			eval(text);
+		} catch(e){
+			messageElement.innerText = e.message;
+		}
 	});
 </script>
-<style>	
 
+<style>	
 	html, body{ 
 		margin:0;
 		height:100%;
 		background-color:black; 
+		overflow:hidden;
 	} 
 
-	#DrawScript{
+	#ScriptContainer {
 		padding:10px;
+		position:fixed;
+		height:100%;
+		width:600px;
+		right:0px;
+		top:0px;
+	}
+
+	#Shadow{
+		position:absolute;
+		top:0;
+		left:0;
+		width:100%;
+		height:100%;
+		background-color:black;
+		opacity:.7;
+		z-index:-1;
+	}
+	
+	#DrawScript{
+		outline:none;
 		display:block;
 		position:fixed;
+		top:0px;
+		right:10px;
 		z-index:10;
 		color:white;
-		top:0px;
-		right:0px;
 		height:100%;
+		width:580px;
 		white-space:pre;
 		font-family:monospace;
 		overflow-y:auto;
+		overflow-x:hidden;
 	}
 
-	#DrawScript:before{
-		content:"";
-		background-color:white;
-		display:block;
-		position:absolute;
-		width:100%;
-		height:100%;
-		top:0px;
-		left:0px;
-		opacity:.3;
-
-	}
-
-	#Error{
+	#Message{
 		padding:20px;
 		position:fixed;
 		top:0px;
 		left:0px;
 		background-color:black;
-		color:red;
+		color:white;
+		font-family:monospace;
 		font-weight:bold;
 	}
 </style>
