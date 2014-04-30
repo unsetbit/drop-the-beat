@@ -3,11 +3,21 @@
 <div id="Message">Drag an mp3 file onto this window.</div>
 <script>
 	var messageElement = document.getElementById('Message');
-	
+
+	function showMessage(message){
+		if(message){
+			messageElement.innerHTML = message;	
+			messageElement.style.display = "block";
+		} else {
+			messageElement.style.display = "none";
+		}
+	}
+
 	try{
 		var context = new (window.AudioContext || window.webkitAudioContext)();
 	} catch(e){
-		messageElement.innerText = "You must use Google Chrome for this to work.";
+		showMessage("You must use Chrome or Firefox for this to work.");
+		throw e;
 	}
 	
 	var canvas = document.querySelector('canvas');
@@ -28,7 +38,7 @@
 		e.preventDefault();
 
 		var files = e.dataTransfer.files;
-		messageElement.innerText = "Loading...";
+		showMessage("Loading...");
 		var reader = new FileReader();
 		reader.readAsArrayBuffer(files[0]);
 		reader.onload = function(e){
@@ -71,7 +81,7 @@
 		}
 
 		if(!hasError){ // don't clear out eval error
-			messageElement.innerText = errorMessage;
+			showMessage(errorMessage);
 		}
 		
 		requestAnimationFrame(function(){
@@ -90,7 +100,7 @@
 <div id="Shadow"></div>
 <script id="DrawScript" contenteditable="true" style="display:none;" spellcheck="false">
 ///////////////////////////////////////////////////
-// EDIT THIS CODE! YOU CAN'T GO WRONG!
+// EDIT THIS!
 ///////////////////////////////////////////////////
 
 window.draw = function(frequencyBinCount, freqs, times){
@@ -135,13 +145,13 @@ window.draw = function(frequencyBinCount, freqs, times){
 	var drawScript = document.querySelector('#DrawScript');
 	var hasError = false;
 	drawScript.addEventListener('keyup', function(){
-		var text = drawScript.innerText;
+		var text = drawScript.innerHTML;
 		try{
 			eval(text);
 			hasError = false;
 		} catch(e){
 			hasError = true;
-			messageElement.innerText = "Unable to update script: " + e.message;
+			showMessage("Unable to update script: " + e.message);
 		}
 	});
 </script>
@@ -164,7 +174,6 @@ window.draw = function(frequencyBinCount, freqs, times){
 	}
 
 	#Shadow{
-		position:absolute;
 		top:0;
 		left:0;
 		width:100%;
